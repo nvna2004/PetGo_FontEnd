@@ -1,21 +1,24 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import {
-  PawPrint,
-  Mail,
-  Lock,
-  User,
+  ArrowRight,
   Eye,
   EyeOff,
-  ArrowRight,
-  ShieldCheck,
   Facebook,
-  Github
+  Github,
+  Lock,
+  Mail,
+  PawPrint,
+  Phone,
+  ShieldCheck,
+  User
 } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,14 +38,16 @@ const RegisterPage = () => {
     setIsLoading(true);
 
     try {
-      // For UX/UI review purposes, simulate a successful registration
-      setTimeout(() => {
-        localStorage.setItem('token', 'mock-token');
-        localStorage.setItem('user', JSON.stringify({ email, name }));
-        navigate('/');
-      }, 1500);
+      await api.post('/auth/register', {
+        email,
+        password,
+        fullName: name,
+        phoneNumber: phone,
+      });
+      navigate('/login');
     } catch (err) {
-      setError('Đã xảy ra lỗi. Vui lòng thử lại.');
+      console.error('Lỗi đăng ký:', err);
+      setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
       setIsLoading(false);
     }
   };
@@ -154,6 +159,23 @@ const RegisterPage = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">Phone Number</label>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0901234567"
                   className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
                   required
                 />

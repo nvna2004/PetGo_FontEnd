@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { useContext, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
+import { AuthContext } from '../context/AuthContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -30,9 +30,9 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/login', { userName: email, password });      
+      const response = await api.post('/auth/login', { userName: email, password });
       login(response.data);
-      
+
       console.log('Đăng nhập thành công!');
       navigate('/');
     } catch (err) {
