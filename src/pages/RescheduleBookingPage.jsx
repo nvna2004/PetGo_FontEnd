@@ -1,276 +1,259 @@
-import React, { useState } from 'react';
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  ArrowRight, 
-  ChevronLeft, 
-  PawPrint, 
-  User, 
-  AlertCircle, 
-  CheckCircle2, 
-  Info,
-  CalendarDays,
-  History,
-  ArrowLeftRight
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  Clock3,
+  Loader2,
+  PawPrint,
+  RefreshCcw,
+  User,
 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { getBookingRescheduleContext, rescheduleBooking } from '../api/bookings';
+import { resolveOwnerUserId } from '../utils/ownerUser';
 
-const App = () => {
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
+const RescheduleBookingPage = () => {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const { account } = useContext(AuthContext);
+  const ownerUserId = resolveOwnerUserId(account);
 
-  // Dữ liệu mẫu lịch hẹn hiện tại
-  const oldBooking = {
-    id: "BK001985",
-    provider: "Paws & Relax Luxury Spa",
-    service: "Gói Tắm Thư Giãn",
-    pet: "LuLu (Corgi)",
-    date: "20 Tháng 5, 2025",
-    time: "10:00 AM",
-    price: "200.000đ"
-  };
+  const [contextData, setContextData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSlotId, setSelectedSlotId] = useState('');
+  const [note, setNote] = useState('');
 
-  // Danh sách các khung giờ mới
-  const timeSlots = [
-    { time: "09:00", available: true },
-    { time: "10:00", available: false },
-    { time: "11:00", available: true },
-    { time: "14:00", available: true },
-    { time: "15:00", available: false },
-    { time: "16:00", available: true },
-    { time: "17:00", available: true },
-    { time: "18:00", available: true },
-  ];
+  const loadContext = async () => {
+    if (!ownerUserId) {
+      setLoading(false);
+      setError('Chưa xác định được ownerUserId để đổi lịch.');
+      return;
+    }
 
-  const handleConfirm = () => {
-    if (selectedDate && selectedTime) {
-      window.location.href = `/bookings/${oldBooking.id}`;
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getBookingRescheduleContext(ownerUserId, id);
+      setContextData(data);
+      setSelectedDate(data.availableDates?.[0] || '');
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Không tải được dữ liệu đổi lịch.');
+      setContextData(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
-      {/* Header PetGo */}
-      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 sm:h-20 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => window.location.href = `/bookings/${oldBooking.id}`}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
-            >
-              <ChevronLeft className="w-6 h-6" />
+  useEffect(() => {
+    loadContext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerUserId, id]);
+
+  const visibleSlots = useMemo(
+    () => (contextData?.slots || []).filter((slot) => slot.date === selectedDate),
+    [contextData, selectedDate],
+  );
+
+  const handleSubmit = async () => {
+    if (!selectedSlotId || !ownerUserId) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const result = await rescheduleBooking(ownerUserId, id, {
+        ownerUserId,
+        newSlotId: Number(selectedSlotId),
+        note,
+      });
+      navigate(`/bookings/${id}`, { state: { flash: result.message || 'Đổi lịch thành công.' } });
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Không thể đổi lịch lúc này.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-orange-500 animate-spin mx-auto mb-4" />
+          <h1 className="text-2xl font-black text-gray-900 mb-2">Đang tải dữ liệu đổi lịch</h1>
+          <p className="text-sm text-gray-500 font-medium">PetGo đang lấy các slot còn trống mới nhất.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !contextData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="max-w-xl w-full bg-white rounded-[2rem] border border-red-100 shadow-sm p-8 text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-black text-gray-900 mb-2">Không mở được trang đổi lịch</h1>
+          <p className="text-sm text-gray-500 font-medium mb-6">{error || 'Dữ liệu đổi lịch chưa sẵn sàng.'}</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={loadContext} className="px-5 py-3 rounded-2xl bg-orange-500 text-white font-black text-xs uppercase tracking-widest hover:bg-orange-600">
+              Thử lại
             </button>
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
-              <div className="bg-orange-500 p-1.5 rounded-lg">
+            <button onClick={() => navigate(`/bookings/${id}`)} className="px-5 py-3 rounded-2xl bg-gray-100 text-gray-700 font-black text-xs uppercase tracking-widest hover:bg-gray-200">
+              Về Booking Detail
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-20">
+      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 h-16 sm:h-20 flex justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(`/bookings/${id}`)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button onClick={() => navigate('/')} className="flex items-center gap-2">
+              <div className="bg-orange-500 p-1.5 rounded-lg shadow-lg shadow-orange-100">
                 <PawPrint className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-black text-gray-900 tracking-tight">Pet<span className="text-orange-500">Go</span></span>
-            </div>
+            </button>
           </div>
-          <div className="w-10 h-10 rounded-full bg-orange-100 border-2 border-white flex items-center justify-center shadow-sm">
+          <button onClick={() => navigate('/profile')} className="w-10 h-10 rounded-full bg-orange-100 border-2 border-white flex items-center justify-center shadow-sm">
             <User className="w-5 h-5 text-orange-600" />
-          </div>
+          </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-10 sm:py-16">
-        <div className="mb-10 text-center sm:text-left">
-          <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-2 tracking-tight">Reschedule Appointment</h1>
-          <p className="text-gray-500 font-medium">Bạn có thể thay đổi thời gian đặt lịch một cách nhanh chóng và dễ dàng.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
-          
-          {/* Main Content Area */}
-          <div className="lg:col-span-2 space-y-8">
-            
-            {/* Current Booking Info Card */}
-            <section className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 flex flex-col sm:flex-row gap-8 items-center bg-gradient-to-br from-white to-gray-50/50">
-              <div className="w-24 h-24 bg-orange-100 rounded-[2rem] flex items-center justify-center shrink-0">
-                <History className="w-10 h-10 text-orange-600" />
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <div className="flex flex-wrap justify-center sm:justify-start gap-2 mb-2">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mã lịch hẹn: {oldBooking.id}</span>
-                  <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md uppercase tracking-widest">{oldBooking.service}</span>
-                </div>
-                <h2 className="text-xl font-black text-gray-900 mb-4">{oldBooking.provider}</h2>
-                <div className="flex flex-wrap justify-center sm:justify-start gap-6">
-                  <div className="flex items-center gap-2 text-sm font-bold text-gray-500">
-                    <CalendarDays className="w-4 h-4 text-orange-500" /> {oldBooking.date}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm font-bold text-gray-500">
-                    <Clock className="w-4 h-4 text-orange-500" /> {oldBooking.time}
-                  </div>
-                </div>
-              </div>
-              <div className="hidden md:block h-20 w-px bg-gray-200"></div>
-              <div className="text-center sm:text-right">
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Thú cưng</p>
-                <p className="font-black text-gray-900">{oldBooking.pet}</p>
-              </div>
-            </section>
-
-            {/* Selection Area */}
-            <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
-              <div className="p-8 sm:p-10">
-                <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-3">
-                  <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
-                  Chọn thời gian mới
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                  {/* Calendar Mock */}
-                  <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Chọn ngày</label>
-                    <div className="grid grid-cols-7 gap-2 bg-gray-50 p-4 rounded-3xl border border-gray-100">
-                      {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(d => (
-                        <div key={d} className="text-center text-[10px] font-black text-gray-300 uppercase mb-2">{d}</div>
-                      ))}
-                      {[...Array(30)].map((_, i) => (
-                        <button 
-                          key={i}
-                          type="button"
-                          onClick={() => setSelectedDate(`${i + 1} Tháng 05, 2025`)}
-                          className={`aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all ${selectedDate === `${i + 1} Tháng 05, 2025` ? 'bg-orange-500 text-white shadow-lg' : 'hover:bg-orange-50 text-gray-700 bg-white'}`}
-                        >
-                          {i + 1}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Time Slots */}
-                  <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Chọn giờ</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {timeSlots.map((slot, i) => (
-                        <button 
-                          key={i}
-                          disabled={!slot.available}
-                          onClick={() => setSelectedTime(slot.time)}
-                          className={`py-4 rounded-2xl text-xs font-black transition-all border-2 ${
-                            !slot.available 
-                            ? 'bg-gray-50 text-gray-200 border-transparent cursor-not-allowed opacity-50' 
-                            : selectedTime === slot.time 
-                              ? 'bg-gray-900 text-white border-gray-900 shadow-xl' 
-                              : 'bg-white text-gray-600 border-gray-100 hover:border-orange-200 hover:bg-orange-50'
-                          }`}
-                        >
-                          {slot.time}
-                          {!slot.available && <span className="block text-[8px] font-bold">Bận</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+      <main className="max-w-6xl mx-auto px-4 py-10 sm:py-16 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <section className="lg:col-span-2 space-y-8">
+          <div className="text-center lg:text-left">
+            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto lg:mx-0 mb-6 border border-blue-100">
+              <RefreshCcw className="w-10 h-10 text-blue-500" />
             </div>
-
-            {/* Policies */}
-            <div className="bg-blue-50/50 rounded-[2rem] p-8 border border-blue-100 flex gap-5">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm">
-                <Info className="w-6 h-6 text-blue-500" />
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Chính sách đổi lịch</h4>
-                  <p className="text-sm font-medium text-blue-700/80 leading-relaxed">
-                    Bạn được phép đổi lịch miễn phí 01 lần trước khi diễn ra lịch hẹn 12 tiếng. Việc đổi lịch quá gần thời điểm hẹn có thể phát sinh phí dịch vụ.
-                  </p>
-                </div>
-                <div className="flex gap-8">
-                   <div className="flex items-center gap-2 text-[10px] font-black text-blue-900 uppercase tracking-widest">
-                     <CheckCircle2 className="w-4 h-4 text-green-500" /> Giới hạn: 01 Lần
-                   </div>
-                   <div className="flex items-center gap-2 text-[10px] font-black text-blue-900 uppercase tracking-widest">
-                     <AlertCircle className="w-4 h-4 text-orange-500" /> Trước: 12 Tiếng
-                   </div>
-                </div>
-              </div>
-            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-2 tracking-tight">Reschedule Booking</h1>
+            <p className="text-gray-500 font-medium">Chọn slot mới cho booking <span className="font-black text-gray-900">{contextData.bookingCode}</span>.</p>
           </div>
 
-          {/* Confirmation Sidebar */}
-          <aside className="lg:sticky lg:top-28 space-y-6">
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-              <div className="bg-gray-900 p-8 text-white">
-                <h3 className="text-xl font-black uppercase tracking-tight">Xác nhận thay đổi</h3>
-                <p className="text-xs font-bold text-gray-400 mt-1">Vui lòng kiểm tra kỹ thời gian mới</p>
-              </div>
-              
-              <div className="p-8 space-y-10">
-                {/* Visual Contrast Comparison */}
-                <div className="space-y-6">
-                  {/* Old Schedule */}
-                  <div className="relative pl-6 border-l-2 border-gray-100 opacity-50">
-                    <span className="absolute -left-2.5 top-0 bg-white p-1">
-                      <History className="w-3 h-3 text-gray-400" />
-                    </span>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Lịch cũ</p>
-                    <p className="text-sm font-bold text-gray-500 leading-tight">
-                      {oldBooking.date} • {oldBooking.time}
-                    </p>
-                  </div>
+          <section className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+            <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
+              <div className="w-2 h-8 bg-orange-500 rounded-full" />
+              Thông tin hiện tại
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <InfoCard icon={<Calendar className="w-4 h-4 text-blue-500" />} label="Ngày hiện tại" value={contextData.currentDateDisplay} />
+              <InfoCard icon={<Clock3 className="w-4 h-4 text-blue-500" />} label="Khung giờ hiện tại" value={contextData.currentTimeDisplay} />
+              <InfoCard icon={<PawPrint className="w-4 h-4 text-orange-500" />} label="Nhà cung cấp" value={contextData.providerName} />
+              <InfoCard icon={<RefreshCcw className="w-4 h-4 text-orange-500" />} label="Số lần đổi lịch" value={String(contextData.rescheduleCount || 0)} />
+            </div>
+          </section>
 
-                  <div className="flex justify-center">
-                    <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center">
-                      <ArrowLeftRight className="w-5 h-5 text-orange-500" />
-                    </div>
-                  </div>
-
-                  {/* New Schedule */}
-                  <div className="relative pl-6 border-l-2 border-orange-500">
-                    <span className="absolute -left-2.5 top-0 bg-white p-1">
-                      <CheckCircle2 className="w-3 h-3 text-orange-500" />
-                    </span>
-                    <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Lịch mới</p>
-                    <p className={`text-sm font-black leading-tight ${selectedDate && selectedTime ? 'text-gray-900' : 'text-gray-300 italic'}`}>
-                      {selectedDate && selectedTime 
-                        ? `${selectedDate} • ${selectedTime}` 
-                        : "Vui lòng chọn lịch mới"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Price Difference */}
-                <div className="pt-6 border-t border-gray-50 flex justify-between items-center">
-                   <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Chênh lệch giá</span>
-                      <span className="text-sm font-black text-green-600">0đ</span>
-                   </div>
-                   <div className="text-right">
-                      <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Thanh toán</span>
-                      <span className="text-lg font-black text-gray-900">{oldBooking.price}</span>
-                   </div>
-                </div>
-
-                <div className="space-y-3 pt-4">
-                  <button 
-                    disabled={!selectedDate || !selectedTime}
-                    onClick={handleConfirm}
-                    className="w-full py-5 bg-orange-500 disabled:bg-gray-100 disabled:text-gray-300 text-white font-black rounded-2xl shadow-xl shadow-orange-100 hover:bg-orange-600 transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center gap-2"
-                  >
-                    Confirm Reschedule <ArrowRight className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => window.location.href = `/bookings/${oldBooking.id}`}
-                    className="w-full py-5 bg-white border border-gray-100 text-gray-400 font-black rounded-2xl hover:bg-gray-50 transition-all uppercase tracking-widest text-[10px]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+          <section className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+            <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
+              <div className="w-2 h-8 bg-orange-500 rounded-full" />
+              Chọn ngày mới
+            </h2>
+            <div className="flex flex-wrap gap-3 mb-8">
+              {(contextData.availableDates || []).map((date) => (
+                <button
+                  key={date}
+                  onClick={() => {
+                    setSelectedDate(date);
+                    setSelectedSlotId('');
+                  }}
+                  className={`px-5 py-3 rounded-2xl text-sm font-black transition-all ${selectedDate === date ? 'bg-gray-900 text-white shadow-lg' : 'bg-gray-50 text-gray-600 border border-gray-100 hover:border-orange-200 hover:text-orange-600'}`}
+                >
+                  {new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(date))}
+                </button>
+              ))}
             </div>
 
-            {/* Quick Note */}
-            <p className="text-[10px] text-gray-400 font-bold text-center px-4 leading-relaxed uppercase tracking-widest">
-              Xác nhận thay đổi lịch đồng nghĩa với việc bạn đồng ý hủy bỏ lịch cũ và thay thế bằng lịch mới này.
-            </p>
-          </aside>
-        </div>
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">Slot còn trống</h3>
+            {visibleSlots.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-gray-50 border border-gray-100 p-6 text-sm font-medium text-gray-500">
+                Chưa có slot trống cho ngày này. Hãy chọn ngày khác.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {visibleSlots.map((slot) => (
+                  <button
+                    key={slot.slotId}
+                    onClick={() => setSelectedSlotId(String(slot.slotId))}
+                    className={`text-left p-5 rounded-[1.5rem] border-2 transition-all ${selectedSlotId === String(slot.slotId) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-100 hover:border-orange-200 bg-white'}`}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <span className="text-base font-black text-gray-900">{slot.label}</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-100 px-3 py-1 rounded-full">
+                        Còn {slot.capacityRemaining}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dịch vụ: {slot.serviceName || contextData.serviceName}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              rows="4"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Ghi chú cho nhà cung cấp nếu cần..."
+              className="w-full mt-6 p-5 bg-gray-50 border-none rounded-2xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-orange-100 transition-all outline-none"
+            />
+          </section>
+        </section>
+
+        <aside className="space-y-6 lg:sticky lg:top-28">
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+            <div className="bg-blue-500 p-8 text-white">
+              <h3 className="text-xl font-black uppercase tracking-tight">Xác nhận đổi lịch</h3>
+              <p className="text-xs font-bold text-blue-100 mt-1 italic">Booking giữ nguyên dịch vụ và thú cưng</p>
+            </div>
+            <div className="p-8 space-y-6">
+              <SummaryRow label="Booking" value={contextData.bookingCode} />
+              <SummaryRow label="Dịch vụ" value={contextData.serviceName} />
+              <SummaryRow label="Ngày mới" value={selectedDate ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(selectedDate)) : 'Chưa chọn'} />
+              <SummaryRow label="Khung giờ mới" value={visibleSlots.find((slot) => String(slot.slotId) === selectedSlotId)?.label || 'Chưa chọn'} />
+              {error ? <p className="text-sm font-bold text-red-600 leading-relaxed">{error}</p> : null}
+              <button
+                disabled={!selectedSlotId || submitting}
+                onClick={handleSubmit}
+                className="w-full py-5 bg-blue-500 disabled:bg-gray-100 disabled:text-gray-300 text-white font-black rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Confirm Reschedule
+              </button>
+              <button onClick={() => navigate(`/bookings/${id}`)} className="w-full py-5 bg-white border border-gray-100 text-gray-400 font-black rounded-2xl hover:bg-gray-50 transition-all uppercase tracking-widest text-[10px]">
+                Back to Detail
+              </button>
+            </div>
+          </div>
+        </aside>
       </main>
     </div>
   );
 };
 
-export default App;
+const InfoCard = ({ icon, label, value }) => (
+  <div className="p-5 rounded-[1.5rem] bg-gray-50 border border-gray-100">
+    <div className="flex items-center gap-2 mb-2 text-gray-500">
+      {icon}
+      <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+    </div>
+    <p className="text-sm font-bold text-gray-800 leading-relaxed">{value}</p>
+  </div>
+);
+
+const SummaryRow = ({ label, value }) => (
+  <div className="flex justify-between items-center gap-4">
+    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label}</span>
+    <span className="text-sm font-black text-gray-900 text-right">{value}</span>
+  </div>
+);
+
+export default RescheduleBookingPage;

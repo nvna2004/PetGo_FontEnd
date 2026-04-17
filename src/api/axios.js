@@ -1,4 +1,5 @@
 import axios from "axios";
+
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 const api = axios.create({
@@ -7,8 +8,8 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const publicEndpoints = ["/auth/login", "/auth/register"];
-    const isPublic = publicEndpoints.some(endpoint => config.url?.includes(endpoint));
+    const publicEndpoints = ["/auth/login", "/auth/register", "/auth/refresh"];
+    const isPublic = publicEndpoints.some((endpoint) => config.url?.includes(endpoint));
 
     if (!isPublic) {
       const token = localStorage.getItem("token");
@@ -16,6 +17,7 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -39,14 +41,11 @@ api.interceptors.response.use(
     const noRetryEndpoints = [
       "/auth/login",
       "/auth/register",
-      "/auth/verify-email", 
-      "/auth/set-username", 
-      "/auth/set-password", 
-      "/auth/forgot-password", 
       "/auth/refresh",
+      "/auth/logout",
     ];
 
-    if (noRetryEndpoints.some((url) => config.url.includes(url))) {
+    if (noRetryEndpoints.some((url) => config.url?.includes(url))) {
       return Promise.reject(error);
     }
 
@@ -54,37 +53,40 @@ api.interceptors.response.use(
       config._retry = true;
 
       const refreshToken = localStorage.getItem("refreshToken");
-
       if (!refreshToken) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("account");
         return Promise.reject(error);
       }
 
       try {
-        const res = await axios.post(
+        const refreshResponse = await axios.post(
           `${baseURL}/auth/refresh`,
           {},
           {
-            headers: { Authorization: `Bearer ${refreshToken}` },
+            headers: {
+              Authorization: `Bearer ${refreshToken}`,
+            },
           }
         );
 
-        const {
-          token,
-          refreshToken: newRefreshToken,
-          account,
-        } = res.data.result || res.data;
+        const refreshResult = refreshResponse.data?.result || refreshResponse.data || {};
+        const nextToken = refreshResult.token;
+        const nextRefreshToken = refreshResult.refreshToken;
+        const nextAccount = refreshResult.user || refreshResult.account;
 
-        localStorage.setItem("token", token);
-        if (newRefreshToken) localStorage.setItem("refreshToken", newRefreshToken);
-        if (account) localStorage.setItem("account", JSON.stringify(account));
+        if (nextToken) localStorage.setItem("token", nextToken);
+        if (nextRefreshToken) localStorage.setItem("refreshToken", nextRefreshToken);
+        if (nextAccount) localStorage.setItem("account", JSON.stringify(nextAccount));
 
-        config.headers.Authorization = `Bearer ${token}`;
-        return axios(config);
-      } catch (err) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${nextToken}`;
+        return api(config);
+      } catch (refreshError) {
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("account");
-        return Promise.reject(err);
+        return Promise.reject(refreshError);
       }
     }
 
