@@ -1,19 +1,16 @@
 import {
-  ArrowRight,
   Eye,
   EyeOff,
-  Facebook,
-  Github,
   Lock,
   Mail,
   PawPrint,
   Phone,
   ShieldCheck,
-  User
+  User,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import { registerRequest } from '../api/auth';
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
@@ -23,12 +20,14 @@ const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (password !== confirmPassword) {
       setError('Mật khẩu xác nhận không khớp.');
@@ -36,33 +35,30 @@ const RegisterPage = () => {
     }
 
     setIsLoading(true);
-
     try {
-      await api.post('/auth/register', {
+      await registerRequest({
         email,
         password,
         fullName: name,
         phoneNumber: phone,
       });
-      navigate('/login');
+      setSuccess('Đăng ký thành công. Đang chuyển sang trang đăng nhập...');
+      setTimeout(() => navigate('/login'), 700);
     } catch (err) {
-      console.error('Lỗi đăng ký:', err);
       setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+    } finally {
       setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans selection:bg-orange-100 selection:text-orange-900">
-      {/* Background Decorative Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-100/50 rounded-full blur-3xl opacity-60"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-100/50 rounded-full blur-3xl opacity-60"></div>
       </div>
 
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-2xl overflow-hidden relative z-10 border border-white/20">
-
-        {/* Left Side: Illustration & Branding (Hidden on mobile) */}
         <div className="hidden lg:flex flex-col justify-between p-12 bg-gray-900 relative overflow-hidden text-white">
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-12">
@@ -71,7 +67,6 @@ const RegisterPage = () => {
               </div>
               <span className="text-3xl font-black tracking-tight">PetGo</span>
             </div>
-
             <h1 className="text-5xl font-black leading-[1.1] mb-6 text-white">
               Join the biggest <br />
               <span className="text-orange-500">pet community.</span>
@@ -80,43 +75,17 @@ const RegisterPage = () => {
               Create an account to start booking the best services for your furry friends.
             </p>
           </div>
-
-          <div className="relative z-10 flex flex-col gap-6">
-            <div className="flex items-center gap-6">
-              <div className="w-12 h-12 rounded-2xl bg-orange-500/20 flex items-center justify-center border border-orange-500/30">
-                <ShieldCheck className="w-6 h-6 text-orange-500" />
-              </div>
-              <div>
-                <p className="text-lg font-black">Trusted Platform</p>
-                <p className="text-gray-400 font-medium italic">Verified by thousands of pet owners</p>
-              </div>
+          <div className="relative z-10 flex items-center gap-6">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/20 flex items-center justify-center border border-orange-500/30">
+              <ShieldCheck className="w-6 h-6 text-orange-500" />
             </div>
-
-            <div className="w-full h-px bg-white/10"></div>
-
-            <div className="flex -space-x-3">
-              {[1, 2, 3, 4].map((i) => (
-                <img
-                  key={i}
-                  src={`https://i.pravatar.cc/150?img=${i + 10}`}
-                  className="w-10 h-10 rounded-full border-2 border-gray-900 object-cover"
-                  alt="User"
-                />
-              ))}
-              <div className="w-10 h-10 rounded-full border-2 border-gray-900 bg-orange-500 flex items-center justify-center text-[10px] font-black">
-                +2k
-              </div>
-              <span className="flex items-center ml-4 text-sm font-bold text-gray-400">Join 2,000+ others already signed up</span>
+            <div>
+              <p className="text-lg font-black">Trusted Platform</p>
+              <p className="text-gray-400 font-medium italic">Verified by thousands of pet owners</p>
             </div>
-          </div>
-
-          {/* Decorative background paw prints */}
-          <div className="absolute top-[-5%] right-[-10%] opacity-5">
-            <PawPrint className="w-64 h-64 rotate-[-15deg]" />
           </div>
         </div>
 
-        {/* Right Side: Register Form */}
         <div className="flex flex-col p-8 sm:p-12 lg:p-16">
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="bg-orange-500 p-1.5 rounded-lg">
@@ -131,159 +100,27 @@ const RegisterPage = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">Full Name</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
-                  <User className="w-5 h-5" />
-                </div>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">Email Address</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">Phone Number</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0901234567"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
-                  required
-                />
-              </div>
-            </div>
+            <InputField label="Full Name" icon={<User className="w-5 h-5" />} value={name} onChange={setName} placeholder="John Doe" />
+            <InputField label="Email Address" type="email" icon={<Mail className="w-5 h-5" />} value={email} onChange={setEmail} placeholder="name@example.com" />
+            <InputField label="Phone Number" type="tel" icon={<Phone className="w-5 h-5" />} value={phone} onChange={setPhone} placeholder="0901234567" />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">Password</label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
-                    <Lock className="w-5 h-5" />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">Confirm</label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
+              <PasswordField label="Password" value={password} setValue={setPassword} showPassword={showPassword} setShowPassword={setShowPassword} icon={<Lock className="w-5 h-5" />} />
+              <PasswordField label="Confirm" value={confirmPassword} setValue={setConfirmPassword} showPassword={showPassword} setShowPassword={setShowPassword} icon={<ShieldCheck className="w-5 h-5" />} />
             </div>
 
-            <div className="flex items-start gap-3 ml-1 py-1">
-              <input
-                type="checkbox"
-                id="terms"
-                className="mt-1 w-5 h-5 rounded-lg border-2 border-gray-200 text-orange-500 focus:ring-orange-500/20 cursor-pointer"
-                required
-              />
-              <label htmlFor="terms" className="text-sm font-bold text-gray-400 leading-snug cursor-pointer select-none">
-                I agree to the <span className="text-orange-500">Terms of Service</span> and <span className="text-orange-500">Privacy Policy</span>.
-              </label>
-            </div>
+            {error && <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{error}</div>}
+            {success && <div className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-bold text-green-600">{success}</div>}
 
-            {error && (
-              <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-2xl text-sm font-bold flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-orange-100 hover:bg-orange-600 hover:shadow-orange-200 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:pointer-events-none group mt-2"
-            >
-              {isLoading ? (
-                <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  Create Account
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
+            <button type="submit" disabled={isLoading} className="w-full py-4 rounded-2xl bg-gray-900 text-white font-black hover:bg-orange-500 transition-all disabled:opacity-60">
+              {isLoading ? 'Đang tạo tài khoản...' : 'Create Account'}
             </button>
           </form>
 
-          <div className="mt-8 relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-100"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-widest font-black text-gray-400">
-              <span className="bg-white px-4">Or sign up with</span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border-2 border-gray-50 rounded-2xl hover:bg-gray-50 transition-all font-bold text-gray-900">
-              <Facebook className="w-5 h-5 text-[#1877F2] fill-current" />
-              <span className="text-sm">Facebook</span>
-            </button>
-            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-white border-2 border-gray-50 rounded-2xl hover:bg-gray-50 transition-all font-bold text-gray-900">
-              <Github className="w-5 h-5 text-[#24292F]" />
-              <span className="text-sm">Github</span>
-            </button>
-          </div>
-
-          <p className="mt-auto pt-10 text-center text-gray-500 font-bold">
-            Already have an account? {' '}
-            <Link to="/login" className="text-orange-600 hover:text-orange-700 underline underline-offset-4 decoration-2 decoration-orange-200 hover:decoration-orange-500 transition-all">
-              Sign In here
+          <p className="text-center text-sm text-gray-500 font-medium mt-8">
+            Already have an account?{' '}
+            <Link to="/login" className="font-black text-orange-600 hover:text-orange-700 transition-colors">
+              Sign in
             </Link>
           </p>
         </div>
@@ -291,5 +128,28 @@ const RegisterPage = () => {
     </div>
   );
 };
+
+const InputField = ({ label, icon, value, onChange, placeholder, type = 'text' }) => (
+  <div className="space-y-2">
+    <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">{label}</label>
+    <div className="relative group">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">{icon}</div>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900" required />
+    </div>
+  </div>
+);
+
+const PasswordField = ({ label, icon, value, setValue, showPassword, setShowPassword }) => (
+  <div className="space-y-2">
+    <label className="text-sm font-black text-gray-900 ml-1 uppercase tracking-widest">{label}</label>
+    <div className="relative group">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">{icon}</div>
+      <input type={showPassword ? 'text' : 'password'} value={value} onChange={(e) => setValue(e.target.value)} placeholder="••••••••" className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all font-medium text-gray-900" required />
+      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition-colors">
+        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+      </button>
+    </div>
+  </div>
+);
 
 export default RegisterPage;
