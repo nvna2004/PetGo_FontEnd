@@ -31,7 +31,12 @@ const LoginPage = () => {
     try {
       const response = await loginRequest({ userName: email, password });
       login(response);
-      navigate('/');
+      const roles = response.result?.user?.roles || [];
+      if (roles.includes('ADMIN')) {
+        navigate('/admin/dashboard'); 
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     } finally {
